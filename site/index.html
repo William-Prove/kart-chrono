@@ -149,8 +149,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   box-sizing: border-box; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
-@media (orientation: landscape) {
-  .sheet { left: auto; top: 0; max-height: none; width: min(380px, 50vw); border-radius: 0; border-top: 0; border-left: 1px solid var(--line);
+@media all {
+  .land .sheet { left: auto; top: 0; max-height: none; width: min(380px, 50%); border-radius: 0; border-top: 0; border-left: 1px solid var(--line);
     padding-top: calc(env(safe-area-inset-top, 0px) + 14px); padding-left: 18px; }
 }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -188,7 +188,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 #rotate svg { width: 92px; height: 92px; color: var(--accent); }
 #rotate b { display: block; margin-top: 14px; font-family: var(--f-display); font-weight: 800; font-size: 28px; text-transform: uppercase; letter-spacing: 1px; }
 #rotate span { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; }
-@media (orientation: portrait) and (pointer: coarse) { #rotate { display: grid; } }
+#rotate.show { display: grid; }
+/* conteneur du jeu : quand iOS bascule l'écran en portrait pendant un gros virage, on le contre-tourne
+   pour que l'image reste fixe par rapport au téléphone */
+#app { position: fixed; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) { #toast { animation: none; } }
 @media (max-height: 420px) {
@@ -200,6 +203,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 }
 </style>
 
+<div id="app">
 <canvas id="gl"></canvas>
 
 <div id="hud" hidden>
@@ -298,6 +302,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   </div>
 </section>
 
+</div>
 <div id="rotate"><div>
   <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="20" width="48" height="26" rx="5"/><path d="M50 12a14 14 0 0 0-12-6"/><path d="M38 2v5h5"/></svg>
   <b>Tourne ton téléphone</b><span>Kart Chrono se joue à l'horizontale.</span>
@@ -392,14 +397,32 @@ const SIM = (() => {
     return walk(segs).pts;
   }
 
+  // Physique : modèle « bicyclette » à pneus. Chaque train (avant / arrière) produit une force latérale qui
+  // dépend de son angle de dérive : progressive, avec un pic d'adhérence puis une légère perte en glissade.
+  // Les forces de traction et de freinage partagent l'adhérence avec le virage (cercle de friction).
   const P = {
-    MAX_V: 26,          // m/s (~94 km/h)
-    ACC: 8.5,           // accélération au départ
-    BRAKE: 20,
+    MAX_V: 26,          // m/s (~94 km/h), vitesse de pointe atteinte naturellement (puissance / traînée)
+    MASS: 160,          // kart + pilote (kg)
+    IZ: 45,             // inertie en lacet (kg·m²)
+    CG_F: 0.58,         // centre de gravité → essieu avant (m)
+    CG_R: 0.47,         // centre de gravité → essieu arrière (m)
+    CG_H: 0.15,         // hauteur du centre de gravité (transfert de charge)
+    MU: 1.65,           // adhérence des pneus
+    MU_F: 0.9,          // avant un peu moins accrocheur que l'arrière : léger sous-virage, comportement sain
+    TIRE_B: 16, TIRE_C: 1.35,   // forme de la courbe pneu (pic vers 8°, puis −11 % en glissade)
+    F_DRIVE: 1000,      // force motrice max (N)
+    POWER: 9300,        // puissance (W)
+    CDA: 0.85,          // traînée aérodynamique
+    ROLL: 0.015,        // résistance au roulement
+    ENGINE_BRAKE: 120,  // frein moteur quand on lâche les gaz (N)
+    F_BRAKE: 1450,      // freinage max (N)
+    BRAKE_RAMP: 0.18,   // temps pour atteindre le freinage max (s) : pas de blocage instantané
+    STEER_LOW: 0.45,    // braquage max des roues à basse vitesse (rad)
+    STEER_RATE: 3.5,    // vitesse de braquage des roues (rad/s)
     REV_MAX: 5,
     WB: 1.05,           // empattement
-    GRIP: 17,           // adhérence latérale max (m/s²)
-    LAT_GRIP: 14,
+    GRIP: 15.5,         // adhérence latérale utile (m/s²), pour le pilote automatique des tests
+    BRAKE: 9,           // décélération au freinage (m/s²), idem
     HALF_LEN: 0.95,     // demi-longueur du kart (hitbox)
     HALF_WID: 0.68,     // demi-largeur du kart (hitbox)
     STEP: 1 / 120,
@@ -583,59 +606,97 @@ const SIM = (() => {
     const k = {
       x: T.x[i], z: T.z[i], y: T.y[i], h: Math.atan2(T.tz[i], T.tx[i]),
       vx: 0, vz: 0, steer: 0, idx: i, sLocal: i * T.ds, sTotal: i * T.ds - T.L,
-      contact: 0, bump: 0, pitch: 0, roll: 0, slip: 0, kerb: 0, wheelSpin: 0
+      contact: 0, bump: 0, pitch: 0, roll: 0, slip: 0, kerb: 0, wheelSpin: 0, r: 0, ax: 0, brk: 0
     };
     return k;
   }
 
   // input: { steer: -1..1 (droite = +), gas: bool, brake: bool }
+  const G = 9.81;
+  // pneus avant : pic puis légère perte (le kart « pousse » si on braque trop) ;
+  // pneus arrière : saturation sans perte (stable, pas de tête-à-queue au moindre excès)
+  const tireFront = (alpha, D) => D * Math.sin(P.TIRE_C * Math.atan(P.TIRE_B * alpha));
+  const tireRear = (alpha, D) => D * Math.sin(Math.atan(P.TIRE_B * 1.15 * alpha));
   function stepKart(T, k, inp, dt) {
-    // 1. braquage
-    let fx = Math.cos(k.h), fz = Math.sin(k.h);
-    let vf = k.vx * fx + k.vz * fz;
-    const sp = Math.abs(vf);
-    const maxSteer = lerp(0.55, 0.2, Math.min(sp / P.MAX_V, 1));
-    const target = clamp(inp.steer, -1, 1) * maxSteer;
-    k.steer += clamp(target - k.steer, -6 * dt, 6 * dt);
-    let yaw = vf / P.WB * Math.tan(k.steer);
-    // virage relevé : plus d'adhérence quand on tourne vers le bas du dévers
-    let grip = P.GRIP;
-    const pb = k._pr;
-    if (pb && pb.bank !== 0 && Math.abs(yaw) > 1e-3) {
-      const rn = -fz * pb.nx + fx * pb.nz;              // alignement côté droit du kart / normale
-      const inside = Math.sign(yaw) * rn * -Math.sign(pb.bank) > 0;
-      grip += 9.81 * Math.sin(Math.abs(pb.bank)) * (inside ? 1.6 : -0.6);
-    }
-    const yawLim = grip * 1.05 / Math.max(sp, 1);
-    yaw = clamp(yaw, -yawLim, yawLim);
-    k.h += yaw * dt;
-
-    // 2. vitesse dans le nouveau repère
-    fx = Math.cos(k.h); fz = Math.sin(k.h);
-    const rx = -fz, rz = fx;
-    vf = k.vx * fx + k.vz * fz;
-    let vl = k.vx * rx + k.vz * rz;
-
-    let a;
-    if (inp.brake) a = vf > 0.5 ? -P.BRAKE : (vf > -P.REV_MAX ? -P.ACC * 0.6 : 0);
-    else if (inp.gas) a = vf < 0 ? P.BRAKE : P.ACC * (1 - (vf / P.MAX_V) ** 2);
-    else a = -Math.sign(vf) * (0.6 + 0.0015 * vf * vf);
-    // pente
+    // 1. dynamique du kart, en 4 sous-pas pour rester stable
+    const SUB = 4, h = dt / SUB, m = P.MASS, a = P.CG_F, b = P.CG_R, L = P.WB;
     const pr0 = k._pr;
-    if (pr0) a -= 9.81 * pr0.slope * (fx * pr0.tx + fz * pr0.tz) * 0.9;
-    const nvf = vf + a * dt;
-    vf = (!inp.gas && !inp.brake && Math.sign(nvf) !== Math.sign(vf)) ? 0 : nvf;
-
-    // adhérence latérale + perte de vitesse en glissade
-    const corr = clamp(vl * P.LAT_GRIP, -grip, grip) * dt;
-    k.slip = Math.abs(vl);
-    vl = Math.abs(corr) > Math.abs(vl) ? 0 : vl - corr;
-    vf -= Math.sign(vf) * Math.min(Math.abs(vf), Math.abs(vl) * 0.8 * dt);
-
-    k.vx = fx * vf + rx * vl;
-    k.vz = fz * vf + rz * vl;
-    k.x += k.vx * dt;
-    k.z += k.vz * dt;
+    // freinage progressif (comme une pédale), et commande de braquage selon la vitesse
+    k.brk = clamp((k.brk || 0) + (inp.brake ? 1 : -3) * dt / P.BRAKE_RAMP, 0, 1);
+    let fx, fz, u, v;
+    for (let sI = 0; sI < SUB; sI++) {
+      fx = Math.cos(k.h); fz = Math.sin(k.h);
+      u = k.vx * fx + k.vz * fz;                       // vitesse vers l'avant
+      v = -k.vx * fz + k.vz * fx;                      // vitesse latérale (vers le côté où l'on tourne quand steer > 0)
+      let r = k.r || 0;
+      const au = Math.abs(u);
+      // braquage max adapté à la vitesse : téléphone à fond = juste à la limite d'adhérence, à toutes les vitesses
+      const dmax = Math.min(P.STEER_LOW, 1.1 * (0.022 + 16 / Math.max(au, 1) ** 2));
+      const target = clamp(inp.steer, -1, 1) * dmax;
+      k.steer += clamp(target - k.steer, -P.STEER_RATE * h, P.STEER_RATE * h);
+      const d = k.steer;
+      // charges sur les essieux (transfert de charge à l'accélération / au freinage)
+      const ax = k.ax || 0;
+      const Fzf = clamp(m * (G * b - ax * P.CG_H) / L, 0.15 * m * G, m * G);
+      const Fzr = clamp(m * (G * a + ax * P.CG_H) / L, 0.15 * m * G, m * G);
+      // forces longitudinales : moteur (arrière), freins (65 % arrière / 35 % avant), traînée, roulement
+      let Fxr = 0, Fxf = 0;
+      const brake = k.brk * P.F_BRAKE;
+      if (inp.brake && u < 0.6) {
+        Fxr = u > -P.REV_MAX ? -420 : 0;               // marche arrière lente
+      } else if (brake > 1 && u > 0.3) {
+        Fxr = Math.max(-brake * 0.3, -0.5 * P.MU * Fzr); Fxf = -(brake + Fxr);   // répartition vers l'avant : freinage stable
+      } else if (inp.gas) {
+        Fxr = u < -0.3 ? P.F_BRAKE * 0.6 : Math.min(P.F_DRIVE, P.POWER / Math.max(au, 1));
+      } else if (au > 0.05) {
+        Fxr = -Math.sign(u) * P.ENGINE_BRAKE;
+      }
+      const cap = (D, F) => clamp(F, -D * 0.97, D * 0.97);
+      Fxr = cap(P.MU * Fzr, Fxr); Fxf = cap(P.MU * Fzf, Fxf);
+      // cercle de friction « adouci » : accélérer ou freiner retire un peu d'adhérence en virage, sans faire partir le kart en toupie
+      const kx = Fxr > 0 ? 0.55 : 0.5;
+      const Dr = Math.sqrt(Math.max(0, (P.MU * Fzr) ** 2 - (kx * Fxr) ** 2)), Df = Math.sqrt(Math.max(0, (P.MU * Fzf) ** 2 - (0.9 * Fxf) ** 2));
+      // forces latérales des pneus selon l'angle de dérive
+      const us = Math.max(au, 0.5);
+      const af = d - Math.atan2(v + a * r, us), ar = -Math.atan2(v - b * r, us);
+      const Fyf = tireFront(af, Df * P.MU_F), Fyr = tireRear(ar, Dr);
+      // gravité : pente (avant / arrière) et dévers (latéral)
+      let Gx = 0, Gy = 0;
+      if (pr0) {
+        Gx = -m * G * pr0.slope * (fx * pr0.tx + fz * pr0.tz);
+        Gy = -m * G * Math.sin(pr0.bank) * (-fz * pr0.nx + fx * pr0.nz);
+      }
+      const drag = 0.6 * P.CDA * u * au + P.ROLL * m * G * Math.sign(u) * Math.min(1, au / 0.5);
+      const FX = Fxr + Fxf * Math.cos(d) - Fyf * Math.sin(d) - drag + Gx;
+      const FY = Fyf * Math.cos(d) + Fxf * Math.sin(d) + Fyr + Gy;
+      let MZ = a * (Fyf * Math.cos(d) + Fxf * Math.sin(d)) - b * Fyr;
+      // anti-tête-à-queue : si le kart tourne sur lui-même plus vite que l'adhérence ne le permet, on le ramène
+      const rLim = 1.1 * ((Df * P.MU_F + Dr) / m) / Math.max(au, 3);   // adhérence latérale encore disponible (freinage compris)
+      if (Math.abs(r) > rLim) MZ -= P.IZ * 10 * (r - Math.sign(r) * rLim);
+      // et on limite la glissade de l'arrière (dérive > 9°) : le kart se remet dans l'axe tout seul, sans contre-braquer
+      const beta = Math.atan2(v, Math.max(au, 1)), bx = Math.abs(beta) - 0.16;
+      if (bx > 0 && au > 3) MZ += P.IZ * 60 * Math.sign(beta) * bx - P.IZ * 4 * r * Math.min(1, bx * 4);
+      let du = FX / m + v * r, dv = FY / m - u * r, dr = MZ / P.IZ;
+      let nu = u + du * h, nv = v + dv * h, nr = r + dr * h;
+      // à l'arrêt : pas de recul parasite quand on lâche tout
+      if (!inp.gas && !inp.brake && Math.sign(nu) !== Math.sign(u) && Math.abs(u) > 0) nu = 0;
+      if (inp.brake && u > 0.3 && nu < 0) nu = 0;
+      // à basse vitesse (et en marche arrière), modèle géométrique : le kart suit ses roues
+      const w = u < 0.5 ? 0 : clamp((au - 2) / 3, 0, 1);
+      if (w < 1) {
+        const rk = nu * Math.tan(d) / L, vk = rk * b;
+        nv = lerp(vk, nv, w); nr = lerp(rk, nr, w);
+      }
+      k.ax = ax + (FX / m - ax) * Math.min(1, h * 25);   // accélération réelle (forces), lissée : sert au transfert de charge
+      k.r = nr;
+      k.h += nr * h;
+      fx = Math.cos(k.h); fz = Math.sin(k.h);
+      k.vx = fx * nu - fz * nv; k.vz = fz * nu + fx * nv;
+      k.x += k.vx * h; k.z += k.vz * h;
+      u = nu; v = nv;
+      k.slip = Math.max(Math.abs(af), Math.abs(ar)) * au;
+    }
+    const vf = u;
     k.wheelSpin += vf * dt / 0.15;
 
     // 3. collisions avec les murs : hitbox = rectangle du kart projeté sur la normale du mur.
@@ -657,6 +718,11 @@ const SIM = (() => {
         const impact = vn / speed;                    // 0 = frôlement, 1 = choc de face
         const loss = 0.75 * Math.pow(impact, 1.6);    // frôlement à 5° ≈ 1 % de perte
         k.vx *= 1 - loss; k.vz *= 1 - loss;
+        if (impact > 0.3) {                           // choc franc : petit rebond (les pneus du mur amortissent)
+          const e = 0.25 * (impact - 0.3) / 0.7 * vn;
+          k.vx -= pr.nx * sg * e; k.vz -= pr.nz * sg * e;
+        }
+        k.r = (k.r || 0) * (1 - 0.7 * impact);
         // le kart se réaligne avec le mur au lieu de rester planté dedans
         if (Math.hypot(k.vx, k.vz) > 1) {
           let tgt = Math.atan2(k.vz, k.vx);
@@ -1317,8 +1383,10 @@ const envMap = (() => {
   return t;
 })();
 
+let appRot = 0;   // rotation appliquée au conteneur du jeu (degrés)
+const viewSize = () => (appRot % 180 !== 0 ? { w: window.innerHeight, h: window.innerWidth } : { w: window.innerWidth, h: window.innerHeight });
 function resize() {
-  const w = window.innerWidth, h = window.innerHeight;
+  const { w, h } = viewSize();
   renderer.setSize(w, h, false);
   cam.aspect = w / h;
   cam.updateProjectionMatrix();
@@ -1765,7 +1833,7 @@ const builtCache = {};
 const getTrack = id => builtCache[id] || (builtCache[id] = SIM.buildTrack(SIM.TRACKS.find(t => t.id === id)));
 let T, kart, S, screen = 'home', running = false, paused = false;
 // les tracés ont changé : nouvelles clés pour ne pas rejouer un fantôme enregistré sur l'ancien tracé
-const REC = 'v5.';
+const REC = 'v6.';   // v6 : nouvelle physique, les anciens chronos ne sont plus comparables
 const bestOf = id => store.get('best.' + REC + id, null);
 const sectOf = id => store.get('sect.' + REC + id, null);
 
@@ -1818,26 +1886,72 @@ function screenAngle() {
   return a * Math.PI / 180;
 }
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Angle du « volant » = rotation du téléphone dans le plan de l'écran, mesurée par la direction de la gravité
+// dans le repère du téléphone. Contrairement à avant, il ne dépend ni de l'orientation de l'écran (si iOS bascule
+// en portrait, la direction reste juste) ni de l'inclinaison vers l'arrière (avant, téléphone penché = il fallait
+// tourner beaucoup plus, et le braquage saturait).
+let calPhi = 0, calSign = 1, calUp = null, calOrient = null;
+const wrapDeg = a => ((a + 540) % 360) - 180;
 function onMotion(e) {
   const g = e.accelerationIncludingGravity;
   if (!g || g.x == null) return;
   gotMotion = true;
-  const th = screenAngle();
-  // composante de la gravité sur l'axe horizontal de l'écran → angle « volant »
-  let v = (g.x * Math.cos(th) - g.y * Math.sin(th)) / 9.81;
-  if (!isIOS) v = -v;
-  const deg = Math.asin(Math.max(-1, Math.min(1, v))) * 180 / Math.PI;
-  tiltRaw = deg;
-  if (wantCalib) { tiltCalib = deg; wantCalib = false; }
+  const rho = Math.hypot(g.x, g.y);
+  if (rho < 2.5) return;                        // téléphone presque à plat : on garde la dernière valeur
+  const phi = Math.atan2(g.x, g.y) * 180 / Math.PI;
+  if (wantCalib) {
+    const th = screenAngle();
+    calPhi = phi;
+    calSign = (Math.cos(phi * Math.PI / 180 - th) >= 0 ? 1 : -1) * (isIOS ? 1 : -1);   // même sens que l'ancien réglage
+    const k = isIOS ? -1 : 1;                   // iOS donne le vecteur gravité, les autres le vecteur opposé
+    calUp = [k * g.x / rho, k * g.y / rho];     // « haut » de l'image, dans le repère du téléphone
+    calOrient = currentOrient();
+    wantCalib = false;
+    applyRotation();
+  }
+  tiltRaw = calSign * wrapDeg(phi - calPhi);
+  tiltCalib = 0;
 }
+// ---------- l'écran qui se retourne ----------
+// iOS ne permet pas de bloquer l'orientation dans Safari. Si l'écran bascule pendant la course (gros virage),
+// on fait tourner le jeu dans l'autre sens : l'image reste fixe par rapport au téléphone.
+function currentOrient() {
+  if (typeof window.orientation === 'number') return window.orientation;
+  const a = window.screen && window.screen.orientation ? window.screen.orientation.angle : 0;
+  return a === 270 ? -90 : a;
+}
+function applyRotation() {
+  const portrait = window.innerWidth < window.innerHeight, cur = currentOrient();
+  let rot = 0;
+  if (calUp && portrait && screen === 'race') rot = Math.round(Math.atan2(calUp[0], calUp[1]) * 2 / Math.PI) * 90;   // haut de l'image → bord du téléphone
+  else if (calOrient !== null && !portrait && Math.abs(cur) === 90 && cur !== calOrient && (screen === 'race' && running)) rot = 180;
+  if (!portrait && rot === 0 && !(screen === 'race' && running)) calOrient = Math.abs(cur) === 90 ? cur : calOrient;
+  rot = ((rot % 360) + 360) % 360;
+  if (rot !== appRot) {
+    appRot = rot;
+    const el = $('app');
+    el.style.width = rot % 180 ? window.innerHeight + 'px' : '';
+    el.style.height = rot % 180 ? window.innerWidth + 'px' : '';
+    el.style.transform = rot === 90 ? 'rotate(90deg) translateY(-100%)' : rot === 270 ? 'rotate(-90deg) translateX(-100%)' : rot === 180 ? 'rotate(180deg) translate(-100%, -100%)' : '';
+  } else if (rot % 180) {
+    $('app').style.width = window.innerHeight + 'px'; $('app').style.height = window.innerWidth + 'px';
+  }
+  // message « tourne ton téléphone » seulement si on n'a jamais été en paysage (aucun repère pour tourner l'image)
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  $('rotate').classList.toggle('show', coarse && portrait && rot === 0);
+  const vs = viewSize(); document.documentElement.classList.toggle('land', vs.w > vs.h);
+  resize();
+}
+window.addEventListener('resize', applyRotation);
+window.addEventListener('orientationchange', () => { applyRotation(); setTimeout(applyRotation, 250); setTimeout(applyRotation, 700); });
 function tiltToSteer() {
   if (tiltRaw == null) return 0;
   let a = tiltRaw - tiltCalib;
   if (settings.invert === '1') a = -a;
   const full = 40 - settings.sens * 3;   // angle pour braquage complet : 37° (doux) … 10° (vif)
   const dz = 1.2;
-  const s = Math.sign(a) * Math.max(0, Math.abs(a) - dz) / (full - dz);
-  return Math.max(-1, Math.min(1, s));
+  const x = Math.min(1, Math.max(0, Math.abs(a) - dz) / (full - dz));
+  return Math.sign(a) * x * (0.7 + 0.3 * x);
 }
 async function enableTilt() {
   if (settings.steer !== 'tilt') return false;
@@ -1984,6 +2098,7 @@ function audioUpdate(dt) {
 // ---------- écrans ----------
 function show(name) {
   screen = name;
+  if (typeof applyRotation === 'function' && $('app')) setTimeout(applyRotation, 0);
   $('home').hidden = name !== 'home';
   $('garage').hidden = name !== 'garage';
   $('hud').hidden = name !== 'race';
@@ -2042,9 +2157,7 @@ $('pCalib').addEventListener('click', () => { wantCalib = true; paused = false; 
 $('pHome').addEventListener('click', goHome);
 $('pSettings').addEventListener('click', () => { openSettings(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'race' && running) { paused = true; show('race'); } });
-const portraitMQ = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
-const onOrient = () => { if (portraitMQ.matches && screen === 'race' && running) { paused = true; show('race'); } };
-portraitMQ.addEventListener ? portraitMQ.addEventListener('change', onOrient) : portraitMQ.addListener(onOrient);
+
 
 // ---------- cartes des circuits ----------
 function drawOutline(cv, T, color) {
@@ -2255,7 +2368,7 @@ function setLens(fov, near) {
   if (cam.fov !== fov || cam.near !== near) { cam.fov = fov; cam.near = near; cam.updateProjectionMatrix(); }
 }
 function updateCamera(dt) {
-  const portrait = window.innerWidth < window.innerHeight;
+  const vs = viewSize(), portrait = vs.w < vs.h;
   const hud = $('hud'), ck = settings.cam === 'cockpit';
   if (hud.classList.contains('cockpit') !== ck) hud.classList.toggle('cockpit', ck);
   if (screen === 'race' && ck) {
@@ -2333,13 +2446,14 @@ function frame(now) {
   renderer.render(scene, cam);
 }
 
+applyRotation();
 resize();
 loadModels();
 loadTrack(SIM.TRACKS.some(t => t.id === settings.lastTrack) ? settings.lastTrack : 'baie');
 renderCards();
 show('home');
 requestAnimationFrame(frame);
-window.__kc = { get S() { return S; }, get kart() { return kart; }, get ghost() { return ghostMesh; }, get lastGhost() { return lastGhost; }, get snd() { return snd; }, get cam() { return cam; }, startTrack, renderer, scene };
+window.__kc = { get S() { return S; }, get kart() { return kart; }, get ghost() { return ghostMesh; }, get lastGhost() { return lastGhost; }, get snd() { return snd; }, get cam() { return cam; }, get input() { return lastInput; }, get tilt() { return [tiltRaw, tiltLive]; }, startTrack, renderer, scene };
 })();
 </script>
 <script>
