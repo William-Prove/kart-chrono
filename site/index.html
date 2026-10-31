@@ -421,7 +421,7 @@ const SIM = (() => {
     BRAKE_RAMP: 0.1,    // temps pour atteindre le freinage max (s)
     TRAIL_BONUS: 1.08,  // adhérence en plus quand on freine en tournant
     STEER_MAX: 0.5,     // braquage max des roues à basse vitesse (rad)
-    STEER_GAIN: 2.2,    // braquage à fond = 2,2× ce que l'adhérence permet : on peut trop braquer (le kart élargit), il faut ralentir
+    STEER_GAIN: 1.7,    // braquage à fond = 1,7× ce que l'adhérence permet : on peut trop braquer (le kart élargit), il faut ralentir
     F_DRIVE: 1000,      // force motrice max (N)
     POWER: 9300,        // puissance (W)
     CDA: 0.85,          // traînée aérodynamique
@@ -648,7 +648,7 @@ const SIM = (() => {
     const excess = Math.max(0, Math.abs(rDemand) * au - A);             // sous-virage (m/s² en trop)
     // trop braquer fait décrocher l'avant : on tourne MOINS qu'en braquant juste ce qu'il faut (le kart élargit)
     const over = Math.min(1, excess / A);
-    const rT = clamp(rDemand, -rLim, rLim) * (1 - 0.3 * over);
+    const rT = clamp(rDemand, -rLim, rLim) * (1 - 0.4 * over);
     k.r = (k.r || 0) + (rT - (k.r || 0)) * Math.min(1, dt / 0.07);
     k.h += k.r * dt;
     // longitudinal
@@ -1824,7 +1824,7 @@ const builtCache = {};
 const getTrack = id => builtCache[id] || (builtCache[id] = SIM.buildTrack(SIM.TRACKS.find(t => t.id === id)));
 let T, kart, S, screen = 'home', running = false, paused = false;
 // les tracés ont changé : nouvelles clés pour ne pas rejouer un fantôme enregistré sur l'ancien tracé
-const REC = 'v8.';   // v8 : direction jusqu'à 90°, murs revus : les anciens chronos ne sont plus comparables
+const REC = 'v9.';   // v9 : direction plus sensible : les anciens chronos ne sont plus comparables
 const bestOf = id => store.get('best.' + REC + id, null);
 const sectOf = id => store.get('sect.' + REC + id, null);
 
@@ -1960,10 +1960,12 @@ function tiltToSteer() {
   if (tiltRaw == null) return 0;
   let a = tiltRaw - tiltCalib;
   if (settings.invert === '1') a = -a;
-  const full = 115 - settings.sens * 5;   // angle pour braquage complet : 90° par défaut (comme un volant), 65° (vif) … 110° (doux)
-  const dz = 1.2;
+  // braquage complet (volant à 90°) avec 40° de téléphone par défaut ; 56° (doux) … 20° (vif)
+  const full = 60 - settings.sens * 4;
+  const dz = 1;
   const x = Math.min(1, Math.max(0, Math.abs(a) - dz) / (full - dz));
-  return Math.sign(a) * x;
+  // courbe progressive : les premiers degrés comptent beaucoup (10° ≈ 34 %, 20° ≈ 66 %), la fin sert aux gros coups de volant
+  return Math.sign(a) * (1 - Math.pow(1 - x, 1.6));
 }
 async function enableTilt() {
   if (settings.steer !== 'tilt') return false;
