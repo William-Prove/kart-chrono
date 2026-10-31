@@ -1,7 +1,7 @@
 /* Kart Chrono — service worker : le jeu se lance et tourne hors ligne.
    Navigation : réseau d'abord (pour récupérer une nouvelle version), cache en secours.
    Ressources : cache d'abord, revalidation en arrière-plan. */
-const VERSION = 'kart-chrono-v3';
+const VERSION = 'kart-chrono-v4';
 const SHELL = [
   './',
   'index.html',

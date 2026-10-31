@@ -17,6 +17,11 @@
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
+/* marges des bords (encoche, barre d'état, barre d'accueil). Quand le jeu est tourné par nos soins (écran verrouillé
+   en portrait), il est déjà placé à l'intérieur de la zone sûre : plus aucune marge iOS à appliquer dedans. */
+:root { --sa-top: env(safe-area-inset-top, 0px); --sa-bottom: env(safe-area-inset-bottom, 0px); --sa-left: env(safe-area-inset-left, 0px); --sa-right: env(safe-area-inset-right, 0px); }
+:root.rot { --sa-top: 0px; --sa-bottom: 0px; --sa-left: 0px; --sa-right: 0px; }
+#saProbe { position: fixed; visibility: hidden; pointer-events: none; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--ink); color: var(--fg); font-family: var(--f-body);
@@ -32,14 +37,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
 #hud button { pointer-events: auto; }
-#tl { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 10px); left: calc(env(safe-area-inset-left, 0px) + 12px); display: flex; gap: 8px; }
+#tl { position: absolute; top: calc(var(--sa-top) + 10px); left: calc(var(--sa-left) + 12px); display: flex; gap: 8px; }
 .hbtn {
   width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel);
   display: grid; place-items: center; padding: 0;
 }
 .hbtn svg { width: 22px; height: 22px; }
 #timer {
-  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 50%; transform: translateX(-50%);
+  position: absolute; top: calc(var(--sa-top) + 8px); left: 50%; transform: translateX(-50%);
   text-align: center; padding: 4px 16px 6px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
   min-width: 168px;
 }
@@ -54,7 +59,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #secs span.bad { background: rgba(255, 80, 104, 0.18); color: var(--bad); }
 #secs span.old { opacity: .55; }
 #side {
-  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 8px); right: calc(env(safe-area-inset-right, 0px) + 12px);
+  position: absolute; top: calc(var(--sa-top) + 8px); right: calc(var(--sa-right) + 12px);
   display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
 }
 #mini { width: 118px; height: 118px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
@@ -63,21 +68,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rows span { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
 .rows b { font-family: var(--f-display); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 16px; }
 #speed {
-  position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(var(--sa-bottom) + 12px); left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
 #speed .v { display: flex; align-items: baseline; gap: 4px; padding: 2px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
 #vKmh { font-family: var(--f-display); font-variant-numeric: tabular-nums; font-weight: 800; font-size: 28px; min-width: 2.2em; text-align: right; }
 #speed .v span { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
 /* en vue pilote, la vitesse quitte le bas de l'écran pour laisser voir le volant */
-#hud.cockpit #speed { top: calc(env(safe-area-inset-top, 0px) + 62px); bottom: auto; left: calc(env(safe-area-inset-left, 0px) + 12px); transform: none; align-items: flex-start; }
+#hud.cockpit #speed { top: calc(var(--sa-top) + 62px); bottom: auto; left: calc(var(--sa-left) + 12px); transform: none; align-items: flex-start; }
 #steerBar { position: relative; width: 120px; height: 6px; border-radius: 3px; background: rgba(13, 27, 36, 0.7); overflow: hidden; }
 #steerBar i { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: var(--accent); }
 #steerBar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--fg); opacity: 0.6; }
 
-.ctl { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); display: flex; gap: 12px; }
-#ctlL { left: calc(env(safe-area-inset-left, 0px) + 14px); }
-#ctlR { right: calc(env(safe-area-inset-right, 0px) + 14px); }
+.ctl { position: absolute; bottom: calc(var(--sa-bottom) + 14px); display: flex; gap: 12px; }
+#ctlL { left: calc(var(--sa-left) + 14px); }
+#ctlR { right: calc(var(--sa-right) + 14px); }
 .pad {
   width: 82px; height: 82px; border-radius: 20px; border: 1px solid var(--line);
   background: rgba(13, 27, 36, 0.5); font-family: var(--f-display); font-weight: 800; font-size: 17px;
@@ -98,7 +103,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #toast .l3 { font-family: var(--f-display); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 20px; }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(.9); opacity: 0; } }
 #notice {
-  position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 110px); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(var(--sa-bottom) + 110px); left: 50%; transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; font-size: 13px;
   max-width: min(420px, 80vw); text-align: center;
 }
@@ -111,8 +116,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* ---------- Menus ---------- */
 .screen {
   position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 16px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: calc(var(--sa-top) + 16px); padding-bottom: calc(var(--sa-bottom) + 20px);
+  padding-left: max(16px, var(--sa-left)); padding-right: max(16px, var(--sa-right));
   box-sizing: border-box;
 }
 #home { z-index: 3; background: linear-gradient(180deg, rgba(13, 27, 36, 0.9) 0%, rgba(13, 27, 36, 0.74) 55%, rgba(13, 27, 36, 0.5) 100%); }
@@ -145,13 +150,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sheet {
   position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 62%; overflow-y: auto; touch-action: pan-y;
   background: var(--panel); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0;
-  padding-top: 14px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 14px; padding-bottom: calc(var(--sa-bottom) + 16px);
+  padding-left: max(16px, var(--sa-left)); padding-right: max(16px, var(--sa-right));
   box-sizing: border-box; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 @media all {
   .land .sheet { left: auto; top: 0; max-height: none; width: min(380px, 50%); border-radius: 0; border-top: 0; border-left: 1px solid var(--line);
-    padding-top: calc(env(safe-area-inset-top, 0px) + 14px); padding-left: 18px; }
+    padding-top: calc(var(--sa-top) + 14px); padding-left: 18px; }
 }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
 .sheet-head h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 26px; text-transform: uppercase; letter-spacing: 1px; }
@@ -205,6 +210,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 }
 </style>
 
+<div id="saProbe"></div>
 <div id="app">
 <canvas id="gl"></canvas>
 
@@ -415,7 +421,7 @@ const SIM = (() => {
     BRAKE_RAMP: 0.1,    // temps pour atteindre le freinage max (s)
     TRAIL_BONUS: 1.08,  // adhérence en plus quand on freine en tournant
     STEER_MAX: 0.5,     // braquage max des roues à basse vitesse (rad)
-    STEER_GAIN: 1.3,    // braquage à fond = 1,3× ce que l'adhérence permet (on sent la limite) ; 1,6× en freinant
+    STEER_GAIN: 2.2,    // braquage à fond = 2,2× ce que l'adhérence permet : on peut trop braquer (le kart élargit), il faut ralentir
     F_DRIVE: 1000,      // force motrice max (N)
     POWER: 9300,        // puissance (W)
     CDA: 0.85,          // traînée aérodynamique
@@ -608,7 +614,7 @@ const SIM = (() => {
     const k = {
       x: T.x[i], z: T.z[i], y: T.y[i], h: Math.atan2(T.tz[i], T.tx[i]),
       vx: 0, vz: 0, steer: 0, idx: i, sLocal: i * T.ds, sTotal: i * T.ds - T.L,
-      contact: 0, bump: 0, pitch: 0, roll: 0, slip: 0, kerb: 0, wheelSpin: 0, r: 0, ax: 0, brk: 0, stun: 0
+      contact: 0, bump: 0, pitch: 0, roll: 0, slip: 0, kerb: 0, wheelSpin: 0, r: 0, ax: 0, brk: 0, stun: 0, wheel: 0
     };
     return k;
   }
@@ -633,9 +639,10 @@ const SIM = (() => {
     if (braking) A *= 1 + (P.TRAIL_BONUS - 1) * k.brk;
     else if (inp.gas && au > 8) A *= 0.97;
     // braquage : progressif sur toute la course du téléphone, quelle que soit la vitesse
-    const gain = braking ? 1.6 : P.STEER_GAIN;
+    const gain = braking ? P.STEER_GAIN * 1.2 : P.STEER_GAIN;
     const dmax = Math.min(P.STEER_MAX, Math.atan(gain * A * P.WB / Math.max(au, 1) ** 2));
     k.steer += (steerIn * dmax - k.steer) * Math.min(1, dt / 0.05);
+    k.wheel = (k.wheel || 0) + (steerIn - (k.wheel || 0)) * Math.min(1, dt / 0.05);   // volant : suit l'inclinaison du téléphone
     // lacet : ce que les roues demandent, limité par l'adhérence (au-delà, le kart élargit)
     const rDemand = u * Math.tan(k.steer) / P.WB, rLim = A / Math.max(au, 1);
     const excess = Math.max(0, Math.abs(rDemand) * au - A);             // sous-virage (m/s² en trop)
@@ -685,15 +692,16 @@ const SIM = (() => {
       if (vn > 0 && speed > 0.01) {
         k.vx -= pr.nx * sg * vn; k.vz -= pr.nz * sg * vn;
         const impact = vn / speed;                    // 0 = frôlement, 1 = choc de face
-        // frôlement (< 6°) presque gratuit ; au-delà, un vrai choc dans les pneus coûte cher
-        const loss = Math.min(0.9, 0.9 * Math.pow(impact, 1.25) + 0.6 * Math.max(0, impact - 0.1));
+        // frôlement (jusqu'à ~10°) : rien, le kart glisse le long ; choc franc (> 30°) : il s'arrête presque
+        const t = clamp((impact - 0.17) / 0.43, 0, 1);
+        const loss = 0.95 * t * t * (3 - 2 * t);
         k.vx *= 1 - loss; k.vz *= 1 - loss;
-        if (impact > 0.3) {                           // choc franc : petit rebond (les pneus du mur amortissent)
+        if (impact > 0.5) {                           // choc franc : petit rebond (les pneus du mur amortissent)
           const e = 0.25 * (impact - 0.3) / 0.7 * vn;
           k.vx -= pr.nx * sg * e; k.vz -= pr.nz * sg * e;
         }
         k.r = (k.r || 0) * (1 - 0.7 * impact);
-        if (impact > 0.15) k.stun = Math.max(k.stun || 0, 1.1 * impact);
+        if (impact > 0.3) k.stun = Math.max(k.stun || 0, 1.1 * impact);
         // le kart se réaligne avec le mur au lieu de rester planté dedans
         if (Math.hypot(k.vx, k.vz) > 1) {
           let tgt = Math.atan2(k.vz, k.vx);
@@ -703,7 +711,7 @@ const SIM = (() => {
         }
         k.bump = Math.max(k.bump, impact);
       }
-      const rub = 1 - 0.5 * dt;                       // frottement tant qu'on racle le mur
+      const rub = 1 - 0.06 * dt;                      // frottement quasi nul quand on longe le mur
       k.vx *= rub; k.vz *= rub;
       k.contact = 1;
     }
@@ -1252,10 +1260,11 @@ const KART3D = (() => {
     mesh.scale.set(1, L, 1);
   }
   // braquage : roues avant, volant, puis bras (si visibles)
-  function pose(grp, steer) {
+  // steer : angle des roues avant (rad) ; wheel : position du volant, -1..1 = -90°..+90° (suit le téléphone)
+  function pose(grp, steer, wheel) {
     const u = grp.userData;
     for (const f of u.front) f.rotation.y = -steer;
-    u.spin.rotation.x = steer * 1.9;
+    u.spin.rotation.x = (wheel === undefined ? steer * 1.9 : wheel * Math.PI / 2);
     if (!u.arms[0].up.visible) return;
     grp.updateMatrixWorld(true);
     const L1 = 0.27, L2 = 0.33;
@@ -1355,7 +1364,18 @@ const envMap = (() => {
 })();
 
 let appRot = 0;   // rotation appliquée au conteneur du jeu (degrés)
-const viewSize = () => (appRot % 180 !== 0 ? { w: window.innerHeight, h: window.innerWidth } : { w: window.innerWidth, h: window.innerHeight });
+// marges sûres réelles de l'écran (en px), lues sur un élément sonde
+function safeInsets() {
+  const el = document.getElementById('saProbe');
+  if (!el) return { t: 0, r: 0, b: 0, l: 0 };
+  const cs = getComputedStyle(el);
+  return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+}
+const viewSize = () => {
+  if (appRot % 180 === 0) return { w: window.innerWidth, h: window.innerHeight };
+  const i = safeInsets();
+  return { w: window.innerHeight - i.t - i.b, h: window.innerWidth - i.l - i.r };
+};
 function resize() {
   const { w, h } = viewSize();
   renderer.setSize(w, h, false);
@@ -1778,7 +1798,7 @@ function loadModels() {
     rebuildKart(); rebuildGhost();
   }, undefined, () => { /* modèle indisponible : pilote de secours */ });
 }
-function animateKart(m, steer) { KART3D.pose(m, steer); }
+function animateKart(m, steer, wheel) { KART3D.pose(m, steer, wheel); }
 let kartMesh = makeKart(kartCfg, false), ghostMesh = makeKart(kartCfg, true);
 scene.add(kartMesh, ghostMesh);
 ghostMesh.visible = false;
@@ -1786,7 +1806,7 @@ function disposeKart(m) { m.traverse(o => { if (o.geometry && !o.userData.shared
 function rebuildKart() {
   scene.remove(kartMesh); disposeKart(kartMesh);
   kartMesh = makeKart(kartCfg, false); scene.add(kartMesh);
-  if (kart) placeMesh(kartMesh, kart.x, kart.y, kart.z, kart.h, kart.pitch, kart.roll, kart.steer);
+  if (kart) placeMesh(kartMesh, kart.x, kart.y, kart.z, kart.h, kart.pitch, kart.roll, kart.steer, kart.wheel);
 }
 function rebuildGhost() {
   const vis = ghostMesh.visible;
@@ -1794,9 +1814,9 @@ function rebuildGhost() {
   ghostMesh = makeKart(kartCfg, true);
   ghostMesh.visible = vis; scene.add(ghostMesh);
 }
-function placeMesh(m, x, y, z, h, pitch, roll, steer) {
+function placeMesh(m, x, y, z, h, pitch, roll, steer, wheel) {
   m.position.set(x, y, z); m.rotation.y = -h; m.rotation.z = pitch || 0; m.rotation.x = roll || 0;
-  animateKart(m, steer || 0);
+  animateKart(m, steer || 0, wheel || 0);
 }
 
 // ---------- état du jeu ----------
@@ -1804,7 +1824,7 @@ const builtCache = {};
 const getTrack = id => builtCache[id] || (builtCache[id] = SIM.buildTrack(SIM.TRACKS.find(t => t.id === id)));
 let T, kart, S, screen = 'home', running = false, paused = false;
 // les tracés ont changé : nouvelles clés pour ne pas rejouer un fantôme enregistré sur l'ancien tracé
-const REC = 'v7.';   // v7 : physique refaite (direction, freinage, chocs), les anciens chronos ne sont plus comparables
+const REC = 'v8.';   // v8 : direction jusqu'à 90°, murs revus : les anciens chronos ne sont plus comparables
 const bestOf = id => store.get('best.' + REC + id, null);
 const sectOf = id => store.get('sect.' + REC + id, null);
 
@@ -1920,8 +1940,13 @@ function applyRotation() {
     const el = $('app');
     el.style.transform = rot === 90 ? 'rotate(90deg) translateY(-100%)' : rot === 270 ? 'rotate(-90deg) translateX(-100%)' : rot === 180 ? 'rotate(180deg) translate(-100%, -100%)' : '';
   }
-  $('app').style.width = rot % 180 ? window.innerHeight + 'px' : '';
-  $('app').style.height = rot % 180 ? window.innerWidth + 'px' : '';
+  // tourné d'un quart de tour : le jeu occupe uniquement la zone sûre (hors barre d'état et barre d'accueil)
+  const el = $('app'), quarter = rot % 180 !== 0, ins = quarter ? safeInsets() : { t: 0, r: 0, b: 0, l: 0 };
+  document.documentElement.classList.toggle('rot', quarter);
+  el.style.top = quarter ? ins.t + 'px' : '';
+  el.style.left = quarter ? ins.l + 'px' : '';
+  el.style.width = quarter ? (window.innerHeight - ins.t - ins.b) + 'px' : '';
+  el.style.height = quarter ? (window.innerWidth - ins.l - ins.r) + 'px' : '';
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   $('rotate').classList.toggle('show', coarse && portrait && rot % 180 === 0);
   $('rotHint').hidden = !!liveUp;               // tant que les capteurs ne sont pas autorisés, on propose le bouton
@@ -1935,7 +1960,7 @@ function tiltToSteer() {
   if (tiltRaw == null) return 0;
   let a = tiltRaw - tiltCalib;
   if (settings.invert === '1') a = -a;
-  const full = 32 - settings.sens * 2.6;   // angle pour braquage complet : 29° (doux) … 6° (vif) ; 19° par défaut
+  const full = 115 - settings.sens * 5;   // angle pour braquage complet : 90° par défaut (comme un volant), 65° (vif) … 110° (doux)
   const dz = 1.2;
   const x = Math.min(1, Math.max(0, Math.abs(a) - dz) / (full - dz));
   return Math.sign(a) * x;
@@ -2399,7 +2424,7 @@ function frame(now) {
     acc += dt;
     while (acc >= P.STEP) { SIM.stepSession(S, kart, input); acc -= P.STEP; }
     handleEvents();
-    placeMesh(kartMesh, kart.x, kart.y, kart.z, kart.h, kart.pitch, kart.roll, kart.steer);
+    placeMesh(kartMesh, kart.x, kart.y, kart.z, kart.h, kart.pitch, kart.roll, kart.steer, kart.wheel);
     const gp = !S.lapActive ? null : settings.ghost === 'sect' ? SIM.sectorGhost(S)
       : (settings.ghost === '1' && S.best) ? SIM.ghostAt(S.best, SIM.lapTime(S)) : null;
     ghostMesh.visible = !!gp;
